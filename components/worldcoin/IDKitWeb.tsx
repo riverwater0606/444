@@ -8,17 +8,45 @@ function loadIDKitScript(): Promise<void> {
   if (w._idkitLoading) return w._idkitLoading;
   w._idkitLoading = new Promise<void>((resolve, reject) => {
     try {
-      const existing = document.querySelector('script[src="https://id.worldcoin.org/idkit.js"]');
-      if (existing) {
+      const primary = 'https://id.worldcoin.org/idkit.js';
+      const fallbacks = [
+        'https://cdn.worldcoin.org/idkit.js',
+      ];
+      const already = document.querySelector(`script[src="${primary}"]`) || document.querySelector('script[data-idkit-script="true"]');
+      if (already) {
         resolve();
         return;
       }
-      const script = document.createElement('script');
-      script.src = 'https://id.worldcoin.org/idkit.js';
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load IDKit script from https://id.worldcoin.org/idkit.js'));
-      document.body.appendChild(script);
+      const tryLoad = (urls: string[]): void => {
+        if (urls.length === 0) {
+          reject(new Error('Failed to load IDKit script'));
+          return;
+        }
+        const url = urls[0];
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.defer = true;
+        script.crossOrigin = 'anonymous';
+        (script as any).dataset.idkitScript = 'true';
+        const timer = setTimeout(() => {
+          console.error('[IDKit] script load timeout for', url);
+          script.remove();
+          tryLoad(urls.slice(1));
+        }, 10000);
+        script.onload = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        script.onerror = () => {
+          clearTimeout(timer);
+          console.error('[IDKit] script onerror for', url);
+          script.remove();
+          tryLoad(urls.slice(1));
+        };
+        (document.head || document.body).appendChild(script);
+      };
+      tryLoad([primary, ...fallbacks]);
     } catch (e) {
       reject(e as Error);
     }
@@ -85,7 +113,7 @@ export function WorldIDVerifyButton({
         .then(() => setReady(true))
         .catch((e) => {
           console.error('IDKit load error', e);
-          setError((e as Error).message);
+          setError((e as Error).message ?? 'Failed to load World ID');
         });
     }
   }, []);
@@ -100,12 +128,12 @@ export function WorldIDVerifyButton({
     openingRef.current = true;
     try {
       await loadIDKitScript();
-      const sdk = (window as any).IDKit;
+      const sdk = (window as any).IDKit ?? (window as any).WorldID?.IDKit ?? (window as any).worldID?.IDKit;
       if (!sdk || typeof sdk.open !== 'function') {
         throw new Error('IDKit SDK not found');
       }
       console.log('[WorldID] Opening widget with action', action);
-      sdk.open({
+      (sdk as any).open({
         app_id: appId,
         action,
         options: { theme: 'auto' },
@@ -136,7 +164,7 @@ export function WorldIDVerifyButton({
   }, [action, appId, callbackUrl]);
 
   return (
-    <View>
+    <View testID="worldid-container">
       {!!error && (
         <Text style={{ color: '#EF4444', marginBottom: 8 }} testID="worldid-error">{error}</Text>
       )}
@@ -145,6 +173,8 @@ export function WorldIDVerifyButton({
         onPress={onPress}
         style={[styles.verifyBtn, { backgroundColor: ready ? currentTheme.primary : currentTheme.border }]}
         testID={testID ?? 'worldid-verify-button'}
+        accessibilityRole="button"
+        accessibilityLabel="Verify with World ID"
       >
         <Text style={styles.verifyText}>
           {settings.language === 'zh' ? '使用 World ID 驗證' : 'Verify with World ID'}
