@@ -36,6 +36,7 @@ function loadIDKitScript(): Promise<void> {
         }, 10000);
         script.onload = () => {
           clearTimeout(timer);
+          console.log('[IDKit] script loaded from', url);
           resolve();
         };
         script.onerror = () => {
@@ -136,6 +137,7 @@ export function WorldIDVerifyButton({
       (sdk as any).open({
         app_id: appId,
         action,
+        enableTelemetry: true,
         options: { theme: 'auto' },
         onSuccess: (result: unknown) => {
           console.log('[WorldID] success', result);
