@@ -8,16 +8,16 @@ function loadIDKitScript(): Promise<void> {
   if (w._idkitLoading) return w._idkitLoading;
   w._idkitLoading = new Promise<void>((resolve, reject) => {
     try {
-      const existing = document.querySelector('script[src="https://cdn.worldcoin.org/idkit.js"]');
+      const existing = document.querySelector('script[src="https://id.worldcoin.org/idkit.js"]');
       if (existing) {
         resolve();
         return;
       }
       const script = document.createElement('script');
-      script.src = 'https://cdn.worldcoin.org/idkit.js';
+      script.src = 'https://id.worldcoin.org/idkit.js';
       script.async = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load IDKit script'));
+      script.onerror = () => reject(new Error('Failed to load IDKit script from https://id.worldcoin.org/idkit.js'));
       document.body.appendChild(script);
     } catch (e) {
       reject(e as Error);
@@ -62,14 +62,14 @@ export function OpenInWorldAppBanner({ testID }: { testID?: string }) {
 }
 
 export function WorldIDVerifyButton({
-  appId,
-  action,
+  appId = (process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d'),
+  action = (process.env.WORLD_ID_ACTION_ID ?? 'psig'),
   callbackUrl,
   children,
   testID,
 }: {
-  appId: string;
-  action: string;
+  appId?: string;
+  action?: string;
   callbackUrl: string;
   children?: React.ReactNode;
   testID?: string;

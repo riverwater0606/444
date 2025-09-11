@@ -321,11 +321,11 @@ export default function ProfileScreen() {
             {!isWorldApp && <OpenInWorldAppBanner testID="worldapp-banner" />}
             <View style={{ marginTop: 12 }}>
               <WorldIDVerifyButton
-                appId="app_38abeb1ac725e5d6e1a3f4db129e1609"
-                action="psig"
+                appId={process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d'}
+                action={process.env.WORLD_ID_ACTION_ID ?? 'psig'}
                 callbackUrl={(typeof window !== 'undefined' && window.location?.host?.includes('localhost'))
                   ? 'http://localhost:3000/callback'
-                  : 'https://rork-global-meditation-spiritual-gu.vercel.app/callback'}
+                  : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback')}
                 testID="verify-with-worldid"
               />
             </View>

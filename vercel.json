@@ -2,7 +2,7 @@
   "buildCommand": "expo export --platform web",
   "outputDirectory": "dist",
   "env": {
-    "WORLD_ID_APP_ID": "app_38abeb1ac725e5d6e1a3f4db129e1609",
+    "WORLD_ID_APP_ID": "app_346b0844d114f6bac06f1d35eb9f3d1d",
     "WORLD_ID_ACTION_ID": "psig",
     "WORLD_ID_CALLBACK_URL": "https://444-two.vercel.app/callback"
   },
