@@ -8,18 +8,36 @@ function loadIDKitScript(): Promise<void> {
   if (w._idkitLoading) return w._idkitLoading;
   w._idkitLoading = new Promise<void>((resolve, reject) => {
     try {
-      const primary = 'https://id.worldcoin.org/idkit.js';
-      const fallbacks = [
+      const sourcesBase = [
+        'https://idkit.worldcoin.org/idkit.js',
+        'https://id.worldcoin.org/idkit.js',
         'https://cdn.worldcoin.org/idkit.js',
       ];
-      const already = document.querySelector(`script[src="${primary}"]`) || document.querySelector('script[data-idkit-script="true"]');
+
+      const already = document.querySelector('script[data-idkit-script="true"]') as HTMLScriptElement | null;
       if (already) {
         resolve();
         return;
       }
+
+      let attempt = 0;
+      const maxAttempts = 3;
+
+      const cycle = (): void => {
+        if (attempt >= maxAttempts) {
+          console.error('[IDKit] Exhausted attempts to load script');
+          reject(new Error('Failed to load IDKit script'));
+          return;
+        }
+        const cacheBust = `v=${Date.now()}-${attempt}`;
+        const urls = sourcesBase.map((u) => `${u}?${cacheBust}`);
+        attempt += 1;
+        tryLoad(urls);
+      };
+
       const tryLoad = (urls: string[]): void => {
         if (urls.length === 0) {
-          reject(new Error('Failed to load IDKit script'));
+          cycle();
           return;
         }
         const url = urls[0];
@@ -28,14 +46,23 @@ function loadIDKitScript(): Promise<void> {
         script.async = true;
         script.defer = true;
         script.crossOrigin = 'anonymous';
+        script.referrerPolicy = 'no-referrer';
         (script as any).dataset.idkitScript = 'true';
+
+        const timeoutMs = 10000;
         const timer = setTimeout(() => {
           console.error('[IDKit] script load timeout for', url);
           script.remove();
           tryLoad(urls.slice(1));
-        }, 10000);
+        }, timeoutMs);
+
         script.onload = () => {
           clearTimeout(timer);
+          // Confirm global is present
+          const sdk = (window as any).IDKit ?? (window as any).WorldID?.IDKit ?? (window as any).worldID?.IDKit;
+          if (!sdk) {
+            console.warn('[IDKit] script loaded but SDK global missing, continuing');
+          }
           console.log('[IDKit] script loaded from', url);
           resolve();
         };
@@ -47,11 +74,20 @@ function loadIDKitScript(): Promise<void> {
         };
         (document.head || document.body).appendChild(script);
       };
-      tryLoad([primary, ...fallbacks]);
+
+      cycle();
     } catch (e) {
       reject(e as Error);
     }
   });
+
+  // If the promise rejects, clear it so future calls can retry
+  w._idkitLoading.catch(() => {
+    try {
+      delete (window as any)._idkitLoading;
+    } catch {}
+  });
+
   return w._idkitLoading;
 }
 

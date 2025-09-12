@@ -6,6 +6,17 @@
     "WORLD_ID_ACTION_ID": "psig",
     "WORLD_ID_CALLBACK_URL": "https://444-two.vercel.app/callback"
   },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "script-src 'self' https://idkit.worldcoin.org https://id.worldcoin.org https://cdn.worldcoin.org 'unsafe-inline'"
+        }
+      ]
+    }
+  ],
   "routes": [
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
