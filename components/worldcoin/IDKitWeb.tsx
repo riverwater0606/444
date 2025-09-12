@@ -140,20 +140,55 @@ export function WorldIDVerifyButton({
   testID?: string;
 }) {
   const { currentTheme, settings } = useSettings();
-  const [ready, setReady] = useState(Platform.OS !== 'web');
+  const [ready, setReady] = useState<boolean>(Platform.OS !== 'web');
   const [error, setError] = useState<string | null>(null);
-  const openingRef = useRef(false);
+  const openingRef = useRef<boolean>(false);
+  const widgetRef = useRef<any | null>(null);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
       loadIDKitScript()
-        .then(() => setReady(true))
+        .then(() => {
+          try {
+            if (!widgetRef.current) {
+              const el: any = document.createElement('idkit-widget');
+              el.setAttribute('style', 'display:none');
+              el.app_id = appId;
+              el.action = action;
+              el.verification_level = 'orb';
+              el.enableTelemetry = true;
+              el.handleVerify = (proof: unknown) => {
+                console.log('Proof:', proof);
+              };
+              el.onSuccess = (res: unknown) => {
+                console.log('Success');
+                try {
+                  const url = new URL(callbackUrl);
+                  url.searchParams.set('result', encodeURIComponent(JSON.stringify(res)));
+                  window.location.href = url.toString();
+                } catch (e) {
+                  console.error('Callback redirect error', e);
+                }
+              };
+              el.onError = (err: any) => {
+                console.error('[WorldID] error', err);
+                setError(err?.message ?? 'Unknown error');
+              };
+              document.body.appendChild(el);
+              widgetRef.current = el;
+            }
+            setReady(true);
+          } catch (e) {
+            console.warn('[IDKit] Widget init failed, will fallback to open()', e);
+            setReady(true);
+          }
+        })
         .catch((e) => {
           console.error('IDKit load error', e);
           setError((e as Error).message ?? 'Failed to load World ID');
         });
     }
-  }, []);
+  }, [action, appId, callbackUrl]);
 
   const onPress = useCallback(async () => {
     if (Platform.OS !== 'web') {
@@ -165,18 +200,28 @@ export function WorldIDVerifyButton({
     openingRef.current = true;
     try {
       await loadIDKitScript();
-      const sdk = (window as any).IDKit ?? (window as any).WorldID?.IDKit ?? (window as any).worldID?.IDKit;
+      if (widgetRef.current && typeof widgetRef.current.open === 'function') {
+        console.log('[WorldID] Opening IDKitWidget (web component) with action', action);
+        widgetRef.current.open();
+        openingRef.current = false;
+        return;
+      }
+      const sdk: any = (window as any).IDKit ?? (window as any).WorldID?.IDKit ?? (window as any).worldID?.IDKit;
       if (!sdk || typeof sdk.open !== 'function') {
         throw new Error('IDKit SDK not found');
       }
-      console.log('[WorldID] Opening widget with action', action);
-      (sdk as any).open({
+      console.log('[WorldID] Opening fallback SDK.open with action', action);
+      sdk.open({
         app_id: appId,
         action,
+        verification_level: 'orb',
         enableTelemetry: true,
         options: { theme: 'auto' },
+        handleVerify: (proof: unknown) => {
+          console.log('Proof:', proof);
+        },
         onSuccess: (result: unknown) => {
-          console.log('[WorldID] success', result);
+          console.log('Success');
           try {
             const url = new URL(callbackUrl);
             url.searchParams.set('result', encodeURIComponent(JSON.stringify(result)));

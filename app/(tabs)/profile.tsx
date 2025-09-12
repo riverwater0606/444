@@ -323,7 +323,7 @@ export default function ProfileScreen() {
               <WorldIDVerifyButton
                 appId={process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d'}
                 action={process.env.WORLD_ID_ACTION_ID ?? 'psig'}
-                callbackUrl={(typeof window !== 'undefined' && window.location?.host?.includes('localhost'))
+                callbackUrl={(typeof window !== 'undefined' && (window.location?.host?.includes('localhost') || window.location?.host?.includes('127.0.0.1')))
                   ? 'http://localhost:3000/callback'
                   : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback')}
                 testID="verify-with-worldid"
