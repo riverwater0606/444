@@ -23,42 +23,41 @@ function loadIDKitScript(): Promise<void> {
       let attempt = 0;
       const maxAttempts = 3;
 
-      const cycle = (): void => {
+      const cycle = (useCacheBust: boolean): void => {
         if (attempt >= maxAttempts) {
           console.error('[IDKit] Exhausted attempts to load script');
           reject(new Error('Failed to load IDKit script'));
           return;
         }
-        const cacheBust = `v=${Date.now()}-${attempt}`;
-        const urls = sourcesBase.map((u) => `${u}?${cacheBust}`);
+        const urls = useCacheBust
+          ? sourcesBase.map((u) => `${u}?v=${Date.now()}-${attempt}`)
+          : [...sourcesBase];
         attempt += 1;
-        tryLoad(urls);
+        tryLoad(urls, useCacheBust);
       };
 
-      const tryLoad = (urls: string[]): void => {
+      const tryLoad = (urls: string[], usedBust: boolean): void => {
         if (urls.length === 0) {
-          cycle();
+          cycle(!usedBust);
           return;
         }
         const url = urls[0];
         const script = document.createElement('script');
         script.src = url;
         script.async = true;
-        script.defer = true;
         script.crossOrigin = 'anonymous';
         script.referrerPolicy = 'no-referrer';
         (script as any).dataset.idkitScript = 'true';
 
-        const timeoutMs = 10000;
+        const timeoutMs = 15000;
         const timer = setTimeout(() => {
           console.error('[IDKit] script load timeout for', url);
           script.remove();
-          tryLoad(urls.slice(1));
+          tryLoad(urls.slice(1), usedBust);
         }, timeoutMs);
 
         script.onload = () => {
           clearTimeout(timer);
-          // Confirm global is present
           const sdk = (window as any).IDKit ?? (window as any).WorldID?.IDKit ?? (window as any).worldID?.IDKit;
           if (!sdk) {
             console.warn('[IDKit] script loaded but SDK global missing, continuing');
@@ -70,18 +69,17 @@ function loadIDKitScript(): Promise<void> {
           clearTimeout(timer);
           console.error('[IDKit] script onerror for', url);
           script.remove();
-          tryLoad(urls.slice(1));
+          tryLoad(urls.slice(1), usedBust);
         };
         (document.head || document.body).appendChild(script);
       };
 
-      cycle();
+      cycle(false);
     } catch (e) {
       reject(e as Error);
     }
   });
 
-  // If the promise rejects, clear it so future calls can retry
   w._idkitLoading.catch(() => {
     try {
       delete (window as any)._idkitLoading;
@@ -156,6 +154,7 @@ export function WorldIDVerifyButton({
               el.app_id = appId;
               el.action = action;
               el.verification_level = 'orb';
+              el.setAttribute('crossorigin', 'anonymous');
               el.enableTelemetry = true;
               el.handleVerify = (proof: unknown) => {
                 console.log('Proof:', proof);
