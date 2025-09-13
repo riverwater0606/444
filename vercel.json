@@ -12,7 +12,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "script-src 'self' https://idkit.worldcoin.org https://id.worldcoin.org https://cdn.worldcoin.org 'unsafe-inline'; object-src 'none'; base-uri 'self'"
+          "value": "script-src 'self' https://idkit.worldcoin.org https://id.worldcoin.org https://cdn.worldcoin.org 'unsafe-inline'; object-src 'none'; base-uri 'self';"
         }
       ]
     }
