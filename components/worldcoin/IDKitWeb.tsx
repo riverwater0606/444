@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View, Linking } from 'react-native';
 import { useSettings } from '@/providers/SettingsProvider';
 
-function loadIDKitScript(): Promise<void> {
+export function loadIDKitScript(): Promise<void> {
   if (Platform.OS !== 'web') return Promise.resolve();
   const w = window as unknown as { _idkitLoading?: Promise<void> } & Window;
   if (w._idkitLoading) return w._idkitLoading;
@@ -246,19 +246,7 @@ export function WorldIDVerifyButton({
     }
   }, [action, appId, callbackUrl]);
 
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    if (!ready) return;
-    try {
-      const mk: any = (window as any).MiniKit;
-      const installed = isWorldApp || (mk && typeof mk.isInstalled === 'function' ? !!mk.isInstalled() : false);
-      if (installed && !openingRef.current) {
-        onPress();
-      }
-    } catch (e) {
-      console.log('[WorldID] MiniKit detection error', e);
-    }
-  }, [ready, isWorldApp, onPress]);
+
 
   return (
     <View testID="worldid-container">

@@ -1,15 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Play, Clock, Heart, Moon, Brain, Zap } from "lucide-react-native";
 import { router } from "expo-router";
+import { loadIDKitScript } from "@/components/worldcoin/IDKitWeb";
 import { useMeditation } from "@/providers/MeditationProvider";
 import { useUser } from "@/providers/UserProvider";
 import { useSettings } from "@/providers/SettingsProvider";
@@ -23,12 +25,109 @@ export default function HomeScreen() {
   const { profile } = useUser();
   const { currentTheme, settings } = useSettings();
   const [affirmation, setAffirmation] = useState(DAILY_AFFIRMATIONS[0]);
+  const [worldError, setWorldError] = useState<string | null>(null);
+  const widgetRef = useRef<any | null>(null);
+  const isWeb = Platform.OS === 'web';
+  const isWorldEnv = useMemo(() => {
+    if (!isWeb) return false;
+    const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '') ?? '';
+    const w = typeof window !== 'undefined' ? (window as any) : {};
+    return ua.includes('WorldApp') || !!w.MiniKit || !!w.miniwallet;
+  }, [isWeb]);
   const lang = settings.language;
 
   useEffect(() => {
     const today = new Date().getDay();
     setAffirmation(DAILY_AFFIRMATIONS[today % DAILY_AFFIRMATIONS.length]);
   }, []);
+
+  useEffect(() => {
+    if (!isWeb) return;
+    let cancelled = false;
+    async function initWorldID() {
+      if (!isWorldEnv) return;
+      try {
+        await loadIDKitScript();
+        if (cancelled) return;
+        if (!widgetRef.current) {
+          const el: any = document.createElement('idkit-widget');
+          el.setAttribute('style', 'display:none');
+          el.app_id = process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d';
+          el.action = process.env.WORLD_ID_ACTION_ID ?? 'psig';
+          el.verification_level = 'orb';
+          el.setAttribute('crossorigin', 'anonymous');
+          (el as any).referrerPolicy = 'no-referrer';
+          el.enableTelemetry = true;
+          el.handleVerify = (proof: unknown) => {
+            console.log('Proof:', proof);
+          };
+          el.onSuccess = (res: unknown) => {
+            console.log('Success');
+            try {
+              const callbackUrl = (typeof window !== 'undefined' && (window.location?.host?.includes('localhost') || window.location?.host?.includes('127.0.0.1')))
+                ? 'http://localhost:3000/callback'
+                : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback');
+              const url = new URL(callbackUrl);
+              url.searchParams.set('result', encodeURIComponent(JSON.stringify(res)));
+              window.location.href = url.toString();
+            } catch (e: any) {
+              console.error('Callback redirect error', e);
+            }
+          };
+          el.onError = (err: any) => {
+            console.error('[WorldID] error', err);
+            setWorldError(err?.message ?? 'Unknown error');
+          };
+          document.body.appendChild(el);
+          widgetRef.current = el;
+        }
+        if (typeof widgetRef.current?.open === 'function') {
+          console.log('[WorldID] Auto opening IDKitWidget on HomeScreen');
+          widgetRef.current.open();
+        } else {
+          const sdk: any = (window as any).IDKit ?? (window as any).WorldID?.IDKit ?? (window as any).worldID?.IDKit;
+          if (sdk && typeof sdk.open === 'function') {
+            console.log('[WorldID] Auto opening via SDK.open on HomeScreen');
+            sdk.open({
+              app_id: process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d',
+              action: process.env.WORLD_ID_ACTION_ID ?? 'psig',
+              verification_level: 'orb',
+              enableTelemetry: true,
+              options: { theme: 'auto' },
+              handleVerify: (proof: unknown) => console.log('Proof:', proof),
+              onSuccess: (result: unknown) => {
+                console.log('Success');
+                try {
+                  const callbackUrl = (typeof window !== 'undefined' && (window.location?.host?.includes('localhost') || window.location?.host?.includes('127.0.0.1')))
+                    ? 'http://localhost:3000/callback'
+                    : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback');
+                  const url = new URL(callbackUrl);
+                  url.searchParams.set('result', encodeURIComponent(JSON.stringify(result)));
+                  window.location.href = url.toString();
+                } catch (e: any) {
+                  console.error('Callback redirect error', e);
+                }
+              },
+              onError: (err: any) => {
+                console.error('[WorldID] error', err);
+                setWorldError(err?.message ?? 'Unknown error');
+              },
+              onClose: () => {
+                console.log('[WorldID] closed');
+              },
+            });
+          }
+        }
+      } catch (e: any) {
+        console.error('IDKit load error', e);
+        setWorldError(e?.message ?? 'Failed to load World ID');
+      }
+    }
+    initWorldID();
+    return () => {
+      cancelled = true;
+    };
+  }, [isWeb, isWorldEnv]);
 
   const quickActions = [
     { id: "breathing", title: lang === "zh" ? "呼吸" : "Breathing", icon: Heart, color: "#EC4899" },
@@ -76,6 +175,14 @@ export default function HomeScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {isWeb && !isWorldEnv && (
+          <View style={styles.worldBanner} testID="worldid-scan-banner">
+            <Text style={styles.worldBannerTitle}>{lang === 'zh' ? '掃描以在 World App 驗證' : 'Scan to Verify in World App'}</Text>
+            {!!worldError && (
+              <Text style={styles.worldBannerError} testID="worldid-error">{worldError}</Text>
+            )}
+          </View>
+        )}
         {/* Daily Affirmation */}
         <View style={[styles.affirmationCard, { backgroundColor: currentTheme.card }]}>
           <Text style={[styles.affirmationLabel, { color: currentTheme.primary }]}>
@@ -362,5 +469,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
     marginTop: 4,
+  },
+  worldBanner: {
+    backgroundColor: "#111827",
+    padding: 14,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 12,
+  },
+  worldBannerTitle: {
+    color: "#F9FAFB",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  worldBannerError: {
+    color: "#FCA5A5",
+    marginTop: 6,
+    fontSize: 12,
   },
 });

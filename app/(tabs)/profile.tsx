@@ -25,8 +25,8 @@ import {
 import { useUser } from "@/providers/UserProvider";
 import { useSettings } from "@/providers/SettingsProvider";
 import { router } from "expo-router";
-import { Platform } from "react-native";
-import { WorldIDVerifyButton, OpenInWorldAppBanner, useIsWorldApp } from "@/components/worldcoin/IDKitWeb";
+
+
 
 export default function ProfileScreen() {
   const { profile, updateProfile, connectWallet, walletAddress } = useUser();
@@ -34,7 +34,7 @@ export default function ProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(profile.name);
   const lang = settings.language;
-  const isWorldApp = useIsWorldApp();
+
 
   const handleSave = () => {
     updateProfile({ name });
@@ -312,25 +312,7 @@ export default function ProfileScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* World ID Verification */}
-        {Platform.OS === 'web' && (
-          <View style={{ paddingHorizontal: 20, marginBottom: 20 }} testID="worldid-section">
-            <Text style={[themedStyles.sectionTitle]}>
-              {lang === 'zh' ? 'World ID 驗證' : 'World ID Verification'}
-            </Text>
-            {!isWorldApp && <OpenInWorldAppBanner testID="worldapp-banner" />}
-            <View style={{ marginTop: 12 }}>
-              <WorldIDVerifyButton
-                appId={process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d'}
-                action={process.env.WORLD_ID_ACTION_ID ?? 'psig'}
-                callbackUrl={(typeof window !== 'undefined' && (window.location?.host?.includes('localhost') || window.location?.host?.includes('127.0.0.1')))
-                  ? 'http://localhost:3000/callback'
-                  : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback')}
-                testID="verify-with-worldid"
-              />
-            </View>
-          </View>
-        )}
+
 
         {/* Settings */}
         <View style={styles.settingsContainer}>
