@@ -142,6 +142,7 @@ export function WorldIDVerifyButton({
   const [error, setError] = useState<string | null>(null);
   const openingRef = useRef<boolean>(false);
   const widgetRef = useRef<any | null>(null);
+  const isWorldApp = useIsWorldApp();
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -245,6 +246,20 @@ export function WorldIDVerifyButton({
     }
   }, [action, appId, callbackUrl]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!ready) return;
+    try {
+      const mk: any = (window as any).MiniKit;
+      const installed = isWorldApp || (mk && typeof mk.isInstalled === 'function' ? !!mk.isInstalled() : false);
+      if (installed && !openingRef.current) {
+        onPress();
+      }
+    } catch (e) {
+      console.log('[WorldID] MiniKit detection error', e);
+    }
+  }, [ready, isWorldApp, onPress]);
+
   return (
     <View testID="worldid-container">
       {!!error && (
@@ -254,7 +269,7 @@ export function WorldIDVerifyButton({
         disabled={!ready}
         onPress={onPress}
         style={[styles.verifyBtn, { backgroundColor: ready ? currentTheme.primary : currentTheme.border }]}
-        testID={testID ?? 'worldid-verify-button'}
+        testID={testID ?? 'verify-with-worldid'}
         accessibilityRole="button"
         accessibilityLabel="Verify with World ID"
       >
