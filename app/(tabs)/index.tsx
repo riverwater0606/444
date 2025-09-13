@@ -17,6 +17,7 @@ import { useUser } from "@/providers/UserProvider";
 import { useSettings } from "@/providers/SettingsProvider";
 import { DAILY_AFFIRMATIONS } from "@/constants/affirmations";
 import { MEDITATION_SESSIONS } from "@/constants/meditations";
+import { MiniKit } from "@worldcoin/minikit-js";
 
 
 
@@ -47,83 +48,33 @@ export default function HomeScreen() {
     async function initWorldID() {
       if (!isWorldEnv) return;
       try {
-        await loadIDKitScript();
+        const installed = typeof (MiniKit as any)?.isInstalled === 'function' ? (MiniKit as any).isInstalled() : ((window as any).MiniKit ? true : false);
+        if (!installed) return;
+        console.log('[WorldID] MiniKit detected, triggering verify on load');
+        const result = await (MiniKit as any).commandsAsync.verify({
+          action: process.env.WORLD_ID_ACTION_ID ?? 'psig',
+          signal: 'user_signal',
+          verification_level: 'orb',
+          enableTelemetry: true,
+        });
         if (cancelled) return;
-        if (!widgetRef.current) {
-          const el: any = document.createElement('idkit-widget');
-          el.setAttribute('style', 'display:none');
-          el.app_id = process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d';
-          el.action = process.env.WORLD_ID_ACTION_ID ?? 'psig';
-          el.verification_level = 'orb';
-          el.setAttribute('crossorigin', 'anonymous');
-          (el as any).referrerPolicy = 'no-referrer';
-          el.enableTelemetry = true;
-          el.handleVerify = (proof: unknown) => {
-            console.log('Proof:', proof);
-          };
-          el.onSuccess = (res: unknown) => {
-            console.log('Success');
-            try {
-              const callbackUrl = (typeof window !== 'undefined' && (window.location?.host?.includes('localhost') || window.location?.host?.includes('127.0.0.1')))
-                ? 'http://localhost:3000/callback'
-                : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback');
-              const url = new URL(callbackUrl);
-              url.searchParams.set('result', encodeURIComponent(JSON.stringify(res)));
-              window.location.href = url.toString();
-            } catch (e: any) {
-              console.error('Callback redirect error', e);
-            }
-          };
-          el.onError = (err: any) => {
-            console.error('[WorldID] error', err);
-            setWorldError(err?.message ?? 'Unknown error');
-          };
-          document.body.appendChild(el);
-          widgetRef.current = el;
-        }
-        if (typeof widgetRef.current?.open === 'function') {
-          console.log('[WorldID] Auto opening IDKitWidget on HomeScreen');
-          widgetRef.current.open();
-        } else {
-          const sdk: any = (window as any).IDKit ?? (window as any).WorldID?.IDKit ?? (window as any).worldID?.IDKit;
-          if (sdk && typeof sdk.open === 'function') {
-            console.log('[WorldID] Auto opening via SDK.open on HomeScreen');
-            sdk.open({
-              app_id: process.env.WORLD_ID_APP_ID ?? 'app_346b0844d114f6bac06f1d35eb9f3d1d',
-              action: process.env.WORLD_ID_ACTION_ID ?? 'psig',
-              verification_level: 'orb',
-              enableTelemetry: true,
-              options: { theme: 'auto' },
-              handleVerify: (proof: unknown) => console.log('Proof:', proof),
-              onSuccess: (result: unknown) => {
-                console.log('Success');
-                try {
-                  const callbackUrl = (typeof window !== 'undefined' && (window.location?.host?.includes('localhost') || window.location?.host?.includes('127.0.0.1')))
-                    ? 'http://localhost:3000/callback'
-                    : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback');
-                  const url = new URL(callbackUrl);
-                  url.searchParams.set('result', encodeURIComponent(JSON.stringify(result)));
-                  window.location.href = url.toString();
-                } catch (e: any) {
-                  console.error('Callback redirect error', e);
-                }
-              },
-              onError: (err: any) => {
-                console.error('[WorldID] error', err);
-                setWorldError(err?.message ?? 'Unknown error');
-              },
-              onClose: () => {
-                console.log('[WorldID] closed');
-              },
-            });
-          }
+        console.log('[WorldID] verify success');
+        try {
+          const callbackUrl = (typeof window !== 'undefined' && (window.location?.host?.includes('localhost') || window.location?.host?.includes('127.0.0.1')))
+            ? 'http://localhost:3000/callback'
+            : (process.env.WORLD_ID_CALLBACK_URL ?? 'https://444-two.vercel.app/callback');
+          const url = new URL(callbackUrl);
+          url.searchParams.set('result', encodeURIComponent(JSON.stringify(result)));
+          window.location.href = url.toString();
+        } catch (e: any) {
+          console.error('Callback redirect error', e);
         }
       } catch (e: any) {
-        console.error('IDKit load error', e);
-        setWorldError(e?.message ?? 'Failed to load World ID');
+        console.error('[WorldID] MiniKit verify error', e);
+        setWorldError(e?.message ?? 'Verification failed');
       }
     }
-    initWorldID();
+    void initWorldID();
     return () => {
       cancelled = true;
     };
